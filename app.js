@@ -161,37 +161,62 @@ function detectMonthYear(text) {
   return { year: y ? Number(y) : null, month };
 }
 
-function parseShifts(rawText) {
+function parseShifts(rawText){
   const text = normalizeText(rawText);
-  const lines = text.split("\n").map((s) => s.trim()).filter(Boolean);
+  const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
 
   const now = new Date();
   const { year: yAuto, month: mAuto } = detectMonthYear(text);
-  const year = yAuto ?? now.getFullYear();
-  const month = mAuto ?? (now.getMonth() + 1);
+  const baseYear = yAuto ?? now.getFullYear();
+  const baseMonth = mAuto ?? (now.getMonth() + 1); // 1-12
 
-  // z.B. "11 Mi." und nächste Zeile "17:45 - 22:15"
-  const reDate = /^(\d{1,2})\s*(Mo|Di|Mi|Do|Fr|Sa|So)\.?$/i;
-  const reTime = /(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/;
+  // Muster:
+  // "11 17:45 - 22:15"
+  // "MI. Kasse - Total Kriftel"
+  const reDayTime = /^(\d{1,2})\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/;
+  const reDowTitle = /^(Mo|Di|Mi|Do|Fr|Sa|So)\.?\s*(.*)$/i;
+
+  let currentYear = baseYear;
+  let currentMonth = baseMonth;
+
+  // Für Monatswechsel erkennen wir, wenn der Tag "kleiner" wird (z.B. 25 -> 01)
+  let lastDaySeen = 0;
 
   const events = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const md = lines[i].match(reDate);
-    if (!md) continue;
+    // Abschnitts-Header wie "Feb. 2026 - KW7" darf ignoriert werden,
+    // detectMonthYear hat uns baseMonth/baseYear schon gegeben.
+    const m1 = lines[i].match(reDayTime);
+    if (!m1) continue;
 
-    const day = Number(md[1]);
-    const timeLine = lines[i + 1] || "";
-    const mt = timeLine.match(reTime);
-    if (!mt) continue;
+    const day = Number(m1[1]);
+    const startStr = m1[2];
+    const endStr = m1[3];
 
-    const titleLine = lines[i + 2] || "Dienst";
-    const start = toDateTimeLocal(year, month, day, mt[1]);
-    const end = toDateTimeLocal(year, month, day, mt[2]);
+    // Monatswechsel: wenn Tag wieder klein wird, Monat +1
+    if (lastDaySeen && day < lastDaySeen) {
+      currentMonth += 1;
+      if (currentMonth > 12) { currentMonth = 1; currentYear += 1; }
+    }
+    lastDaySeen = day;
 
-    if (end < start) end.setDate(end.getDate() + 1); // über Mitternacht
+    const line2 = lines[i + 1] || "";
+    const m2 = line2.match(reDowTitle);
 
-    events.push(mkEvent(titleLine, start, end));
+    // Titel ist alles nach dem Wochentag, sonst fallback
+    const title = m2 ? (m2[2]?.trim() || "Dienst") : "Dienst";
+
+    const start = toDateTimeLocal(currentYear, currentMonth, day, startStr);
+    const end = toDateTimeLocal(currentYear, currentMonth, day, endStr);
+
+    // Schicht über Mitternacht
+    if (end < start) end.setDate(end.getDate() + 1);
+
+    events.push(mkEvent(title, start, end));
+
+    // Wir haben 2 Zeilen verbraucht, also i++ überspringen
+    i += 1;
   }
 
   return events;
