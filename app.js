@@ -125,13 +125,13 @@ function mkEvent(title, start, end) {
 // ---------------- Parser ----------------
 function normalizeText(t){
   return (t || "")
-    .replace(/\r\n/g, "\n")     // WICHTIG: Windows -> Unix
+    .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/[–—]/g, "-")
     .replace(/\u00A0/g, " ")
     .replace(/S/g, "5")
     .replace(/O/g, "0")
-    .replace(/[ \t]+/g, " ");  // Mehrfachspaces glätten
+    .replace(/[ \t]+/g, " ");
 }
 
 function detectMonthYear(text) {
@@ -171,12 +171,13 @@ function parseShifts(rawText){
   let currentYear = yAuto ?? now.getFullYear();
   let currentMonth = mAuto ?? (now.getMonth() + 1);
 
-  // Matcht Block:
-  // 11 17:45 - 22:15
-  // MI. Kasse - Total Kriftel
-  // (tolerant für Spaces, Punkt, und Zeilenenden)
+  // Sehr tolerant:
+  // - akzeptiert \n oder \r\n (normalizeText sollte das schon vereinheitlichen)
+  // - Wochentag egal ob "MI.", "Mi.", "So." usw.
+  // - erlaubt beliebige Spaces / Tabs zwischen allem
+  // - erlaubt auch "So.  Kasse ..." (doppelte Spaces)
   const rePair =
-    /(?:^|\n)\s*(\d{1,2})\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*\n\s*(Mo|Di|Mi|Do|Fr|Sa|So)\.?\s*(.*?)(?=\n|$)/gim;
+    /(?:^|\n)\s*(\d{1,2})\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*\n\s*(mo|di|mi|do|fr|sa|so)\s*\.?\s*(.+?)(?=\n|$)/gi;
 
   let lastDaySeen = 0;
   const events = [];
@@ -186,7 +187,7 @@ function parseShifts(rawText){
     const day = Number(m[1]);
     const startStr = m[2];
     const endStr = m[3];
-    const title = (m[5] || "Dienst").trim() || "Dienst";
+    const title = (m[5] || "Dienst").trim();
 
     // Monatswechsel (25 -> 01)
     if (lastDaySeen && day < lastDaySeen) {
@@ -202,7 +203,6 @@ function parseShifts(rawText){
     events.push(mkEvent(title, start, end));
   }
 
-  console.log("parseShifts events:", events); // <- zum Prüfen
   return events;
 }
 
