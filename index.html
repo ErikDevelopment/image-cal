@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dienstplan OCR → Apple Kalender</title>
+  <style>
+    :root{
+      --bg0:#070716;
+      --bg1:#0b0a1c;
+      --card:#101032cc;
+      --stroke:#ffffff1a;
+      --stroke2:#b9a7ff2a;
+      --text:#e9e7ff;
+      --muted:#bcb6ffb3;
+      --muted2:#bcb6ff80;
+      --glow:#8f7dff;
+      --glow2:#5b4cff;
+      --shadow: 0 20px 80px #000000aa;
+      --radius: 22px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 15% 5%, #2a1b6a66, transparent 60%),
+        radial-gradient(900px 600px at 85% 25%, #3a2aa866, transparent 60%),
+        radial-gradient(900px 600px at 40% 85%, #1a3b9a44, transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+
+    /* subtle stars */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background:
+        radial-gradient(1px 1px at 10% 20%, #ffffff55, transparent 60%),
+        radial-gradient(1px 1px at 30% 70%, #ffffff44, transparent 60%),
+        radial-gradient(1px 1px at 80% 30%, #ffffff55, transparent 60%),
+        radial-gradient(1px 1px at 55% 15%, #ffffff44, transparent 60%),
+        radial-gradient(1px 1px at 70% 85%, #ffffff44, transparent 60%),
+        radial-gradient(1px 1px at 15% 90%, #ffffff33, transparent 60%);
+      pointer-events:none;
+      opacity:.45;
+      filter: blur(.2px);
+    }
+
+    .wrap{
+      max-width: 1200px;
+      margin: 56px auto;
+      padding: 0 18px 70px;
+    }
+
+    header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:20px;
+      margin-bottom: 18px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .brand h1{
+      margin:0;
+      font-size: 22px;
+      letter-spacing: .2px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .brand p{
+      margin:0;
+      color:var(--muted);
+      font-size: 13px;
+      max-width: 650px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, #14143b88, #0b0b2088);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px #00000066;
+      color: var(--muted);
+      font-size: 12px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:99px;
+      background: radial-gradient(circle at 30% 30%, #fff, var(--glow));
+      box-shadow: 0 0 18px var(--glow);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 920px){
+      header{flex-direction:column; align-items:flex-start}
+      .grid{grid-template-columns:1fr}
+    }
+
+    .card{
+      position:relative;
+      border-radius: var(--radius);
+      border: 1px solid var(--stroke);
+      background:
+        radial-gradient(900px 220px at 25% -10%, #8f7dff33, transparent 50%),
+        radial-gradient(700px 260px at 80% 0%, #5b4cff22, transparent 55%),
+        linear-gradient(180deg, #12123bcc, #0d0d25cc);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      min-height: 240px;
+    }
+
+    /* inner border glow */
+    .card::after{
+      content:"";
+      position:absolute; inset:0;
+      border-radius: var(--radius);
+      padding:1px;
+      background: linear-gradient(135deg, #ffffff22, #b9a7ff22, transparent 60%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      pointer-events:none;
+    }
+
+    .card .content{
+      position:relative;
+      padding: 22px 22px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      height:100%;
+    }
+
+    .kicker{
+      color: var(--muted2);
+      font-size: 12px;
+      letter-spacing:.25px;
+    }
+    .title{
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin: 0;
+    }
+    .desc{
+      margin:0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 520px;
+    }
+
+    /* top left mini meter (like the screenshot) */
+    .meter{
+      width: 210px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      padding: 12px 12px;
+      background: linear-gradient(180deg, #15154688, #0c0c2388);
+      box-shadow: 0 14px 40px #00000066;
+      backdrop-filter: blur(12px);
+      margin-bottom: 8px;
+    }
+    .meter .row{
+      display:flex; align-items:center; justify-content:space-between;
+      font-size:12px; color:var(--muted);
+      margin-bottom:10px;
+    }
+    .bar{
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: #0b0b1e;
+      overflow:hidden;
+      position:relative;
+    }
+    .bar > span{
+      position:absolute; inset:0;
+      width: 64%;
+      background: linear-gradient(90deg, #8f7dff, #5b4cff);
+      box-shadow: 0 0 18px #8f7dffaa;
+      border-radius: 999px;
+    }
+
+    /* orbit graphic */
+    .orbit{
+      position:absolute;
+      left: 0; right: 0;
+      bottom: -30px;
+      height: 210px;
+      opacity: .65;
+      pointer-events:none;
+    }
+
+    /* icons */
+    .iconBox{
+      position:absolute;
+      right: 26px;
+      top: 26px;
+      width: 92px;
+      height: 92px;
+      border-radius: 22px;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, #16164a99, #0b0b2199);
+      box-shadow: 0 22px 60px #00000088;
+      display:grid;
+      place-items:center;
+      backdrop-filter: blur(14px);
+    }
+
+    .badge{
+      position:absolute;
+      background: #0c0c2088;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 12px;
+      box-shadow: 0 18px 40px #00000066;
+      backdrop-filter: blur(12px);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .badge::after{
+      content:"";
+      width:0;height:0;
+      border:8px solid transparent;
+      border-left-color: #ffffff18;
+      position:absolute;
+      right:-16px; top: 50%;
+      transform: translateY(-50%);
+      filter: blur(.2px);
+      opacity:.9;
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    button, .file{
+      appearance:none;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #17174a88, #0b0b2088);
+      color: var(--text);
+      padding: 10px 12px;
+      font-weight: 650;
+      font-size: 13px;
+      cursor:pointer;
+      box-shadow: 0 14px 40px #00000066;
+      backdrop-filter: blur(12px);
+      transition: transform .12s ease, border-color .12s ease;
+    }
+    button:hover, .file:hover{ transform: translateY(-1px); border-color: var(--stroke2); }
+    button:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
+    input[type="file"]{ display:none; }
+    .file{ display:inline-flex; align-items:center; gap:10px; }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #e9e7ffcc;
+      background: #070716aa;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 128px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: inset 0 0 0 1px #00000033;
+    }
+
+    .small{
+      font-size: 12px;
+      color: var(--muted2);
+      margin: 0;
+    }
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .spinner{
+      width:14px;height:14px;border-radius:99px;
+      border:2px solid #ffffff22;
+      border-top-color: #ffffffaa;
+      animation: spin 1s linear infinite;
+      display:none;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .chiprow{
+      display:flex; flex-wrap:wrap; gap:10px; margin-top: 10px;
+    }
+    .chip{
+      border: 1px solid var(--stroke);
+      background: #0c0c2088;
+      padding: 8px 10px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <h1>Dienstplan Screenshot → Apple Kalender</h1>
+        <p>Upload ein Bild (z.B. dein Dienstplan), der Text wird per OCR extrahiert, Schichten werden erkannt und als <span class="mono" style="padding:2px 6px;border-radius:8px">.ics</span> Datei exportiert.</p>
+      </div>
+      <div class="pill"><span class="dot"></span> Design: Dark Glass / Neon • OCR: Tesseract.js • Export: iCalendar</div>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1 -->
+      <section class="card">
+        <div class="content">
+          <div class="meter">
+            <div class="row"><span>OCR</span><span id="ocrPct">bereit</span></div>
+            <div class="bar"><span id="barFill" style="width:0%"></span></div>
+          </div>
+
+          <p class="kicker">Flexible Configuration</p>
+          <h2 class="title">Upload &amp; Text Extract</h2>
+          <p class="desc">Lade deinen Screenshot hoch. Danach extrahieren wir den Text und zeigen ihn dir an — du kannst ihn prüfen, bevor Termine erzeugt werden.</p>
+
+          <div class="actions">
+            <label class="file">
+              📷 Bild auswählen
+              <input id="file" type="file" accept="image/*" />
+            </label>
+            <button id="run">OCR starten</button>
+          </div>
+
+          <div class="status">
+            <span class="spinner" id="spin"></span>
+            <span id="status">Warte auf Bild…</span>
+          </div>
+
+          <svg class="orbit" viewBox="0 0 900 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="450" cy="210" r="190" stroke="rgba(185,167,255,.25)" stroke-width="1.2"/>
+            <circle cx="450" cy="210" r="140" stroke="rgba(185,167,255,.18)" stroke-width="1.2"/>
+            <circle cx="450" cy="210" r="90"  stroke="rgba(185,167,255,.12)" stroke-width="1.2"/>
+            <circle cx="450" cy="210" r="40"  stroke="rgba(185,167,255,.10)" stroke-width="1.2"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- Card 2 -->
+      <section class="card">
+        <div class="content">
+          <div class="iconBox" aria-hidden="true">
+            <!-- shield icon -->
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>
+              <path d="M9 12l2 2 4-5" stroke="rgba(255,255,255,.9)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <div class="badge" style="top:22px; left: 56%;">
+            Bang Jago
+          </div>
+          <div class="badge" style="top:90px; left: 44%;">
+            Yanto
+          </div>
+          <div class="badge" style="top:58px; right: 18px;">
+            Jessica
+          </div>
+
+          <p class="kicker">Credible Security</p>
+          <h2 class="title">Parser &amp; Events</h2>
+          <p class="desc">Wir erkennen Datum, Zeitspanne und Job-Titel. Danach erstellen wir iCalendar-Events. Du kannst die erkannten Termine unten sehen.</p>
+
+          <div class="chiprow">
+            <span class="chip">DE Monat/Wochentage</span>
+            <span class="chip">OCR-Fehler-Toleranz</span>
+            <span class="chip">ICS kompatibel</span>
+          </div>
+
+          <svg class="orbit" viewBox="0 0 900 260" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:.5">
+            <rect x="520" y="30" width="300" height="170" rx="26" stroke="rgba(185,167,255,.20)"/>
+            <rect x="560" y="50" width="220" height="130" rx="22" stroke="rgba(185,167,255,.14)"/>
+            <rect x="610" y="70" width="120" height="90" rx="18" stroke="rgba(185,167,255,.10)"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- Card 3 -->
+      <section class="card">
+        <div class="content">
+          <p class="kicker">Unlimited Speed</p>
+          <h2 class="title">OCR Text Output</h2>
+          <p class="desc">Hier siehst du den rohen OCR-Text. Wenn etwas falsch ist (z.B. „22:1S“), können wir das später automatisch korrigieren.</p>
+
+          <div id="out" class="mono">Noch kein Text.</div>
+
+          <svg class="orbit" viewBox="0 0 900 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="350" cy="150" r="150" stroke="rgba(185,167,255,.22)" />
+            <circle cx="350" cy="150" r="105" stroke="rgba(185,167,255,.14)" />
+            <circle cx="350" cy="150" r="60" stroke="rgba(185,167,255,.10)" />
+            <circle cx="350" cy="150" r="18" fill="rgba(185,167,255,.20)" />
+            <path d="M350 140l-8 20h10l-6 20 16-26h-10l6-14z" fill="rgba(255,255,255,.85)"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- Card 4 -->
+      <section class="card">
+        <div class="content">
+          <div class="iconBox" aria-hidden="true" style="right:auto; left:26px;">
+            <!-- network icon -->
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3a3 3 0 0 1 3 3v1a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z" fill="rgba(255,255,255,.9)"/>
+              <path d="M6 14a3 3 0 0 1 3 3v1a3 3 0 0 1-6 0v-1a3 3 0 0 1 3-3z" fill="rgba(255,255,255,.75)"/>
+              <path d="M18 14a3 3 0 0 1 3 3v1a3 3 0 0 1-6 0v-1a3 3 0 0 1 3-3z" fill="rgba(255,255,255,.75)"/>
+              <path d="M12 9v4M9 12h6" stroke="rgba(185,167,255,.7)" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M12 9l-6 5M12 9l6 5" stroke="rgba(185,167,255,.35)" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+
+          <p class="kicker">Access Remote Console</p>
+          <h2 class="title">Export .ics</h2>
+          <p class="desc">Wenn Termine erkannt wurden, kannst du eine <b>.ics</b>-Datei herunterladen und in Apple Kalender importieren.</p>
+
+          <div class="actions" style="margin-top:10px">
+            <button id="download" disabled>ICS herunterladen</button>
+            <button id="demo">Demo-Termine erzeugen</button>
+          </div>
+
+          <p class="small" id="summary">Keine Termine erkannt.</p>
+
+          <div class="mono" id="preview" style="min-height: 128px;">Noch keine Vorschau.</div>
+
+          <svg class="orbit" viewBox="0 0 900 260" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:.55">
+            <rect x="520" y="60" width="250" height="120" rx="26" stroke="rgba(185,167,255,.16)" stroke-dasharray="6 7"/>
+            <path d="M700 180c30-10 40-28 40-55 0-35-30-60-68-60-20 0-38 6-52 18" stroke="rgba(185,167,255,.22)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M660 150c15-5 20-14 20-28 0-18-16-32-36-32-11 0-20 3-28 10" stroke="rgba(185,167,255,.16)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import Tesseract from "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js";
+
+    const fileEl = document.getElementById("file");
+    const runBtn = document.getElementById("run");
+    const outEl = document.getElementById("out");
+    const dlBtn = document.getElementById("download");
+    const demoBtn = document.getElementById("demo");
+    const statusEl = document.getElementById("status");
+    const spinEl = document.getElementById("spin");
+    const ocrPct = document.getElementById("ocrPct");
+    const barFill = document.getElementById("barFill");
+    const summaryEl = document.getElementById("summary");
+    const previewEl = document.getElementById("preview");
+
+    let lastIcs = "";
+    let lastEvents = [];
+
+    function setBusy(on){
+      spinEl.style.display = on ? "inline-block" : "none";
+      runBtn.disabled = on;
+      demoBtn.disabled = on;
+      if (on) statusEl.textContent = "OCR läuft…";
+    }
+
+    fileEl.addEventListener("change", () => {
+      const f = fileEl.files?.[0];
+      statusEl.textContent = f ? `Ausgewählt: ${f.name}` : "Warte auf Bild…";
+    });
+
+    runBtn.addEventListener("click", async () => {
+      const file = fileEl.files?.[0];
+      if (!file){
+        statusEl.textContent = "Bitte erst ein Bild auswählen.";
+        return;
+      }
+
+      setBusy(true);
+      outEl.textContent = "OCR startet…";
+      ocrPct.textContent = "0%";
+      barFill.style.width = "0%";
+
+      try{
+        const { data } = await Tesseract.recognize(file, "deu", {
+          logger: (m) => {
+            if (m.status === "recognizing text" && typeof m.progress === "number"){
+              const p = Math.round(m.progress * 100);
+              ocrPct.textContent = p + "%";
+              barFill.style.width = p + "%";
+            }
+          }
+        });
+
+        const text = data.text || "";
+        outEl.textContent = text.trim() || "Kein Text erkannt.";
+
+        // Events aus Text parsen (Monat/Jahr auto + Fallback)
+        lastEvents = parseShifts(text);
+        lastIcs = buildIcs(lastEvents);
+
+        renderSummary(lastEvents, lastIcs);
+        statusEl.textContent = lastEvents.length ? "Termine erkannt ✅" : "Keine Termine erkannt (Text prüfen).";
+      }catch(err){
+        console.error(err);
+        statusEl.textContent = "Fehler bei OCR. Tipp: Seite über einen lokalen Server öffnen.";
+        outEl.textContent = String(err);
+      }finally{
+        setBusy(false);
+      }
+    });
+
+    demoBtn.addEventListener("click", () => {
+      // Demo passend zu deinem Screenshot: Feb 2026
+      lastEvents = [
+        mkEvent("Kasse - Total Kriftel", new Date(2026,1,11,17,45), new Date(2026,1,11,22,15)),
+        mkEvent("Kasse - Total Kriftel", new Date(2026,1,15,13,45), new Date(2026,1,15,22,15)),
+        mkEvent("Kasse - Total Kriftel", new Date(2026,1,18,17,45), new Date(2026,1,18,22,15)),
+        mkEvent("Kasse - Total Kriftel", new Date(2026,1,22,14,45), new Date(2026,1,22,22,15)),
+        mkEvent("Kasse - Total Kriftel", new Date(2026,1,25,17,45), new Date(2026,1,25,22,15)),
+        mkEvent("Kasse - Total Kriftel", new Date(2026,2,1,14,45),  new Date(2026,2,1,22,15)),
+      ];
+      lastIcs = buildIcs(lastEvents);
+      renderSummary(lastEvents, lastIcs);
+      statusEl.textContent = "Demo-Termine erzeugt ✅";
+    });
+
+    dlBtn.addEventListener("click", () => {
+      const blob = new Blob([lastIcs], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "dienstplan.ics";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    function renderSummary(events, ics){
+      dlBtn.disabled = events.length === 0;
+      summaryEl.textContent = events.length
+        ? `${events.length} Termin(e) erkannt.`
+        : "Keine Termine erkannt.";
+
+      previewEl.textContent = events.length
+        ? events.map(e => `${fmtDE(e.start)} – ${fmtTime(e.end)} | ${e.title}`).join("\n")
+        : "Noch keine Vorschau.";
+    }
+
+    function fmtDE(d){
+      const dd = String(d.getDate()).padStart(2,"0");
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const yyyy = d.getFullYear();
+      return `${dd}.${mm}.${yyyy} ${fmtTime(d)}`;
+    }
+    function fmtTime(d){
+      return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    }
+
+    function mkEvent(title, start, end){
+      return { title, start, end, description: "Automatisch aus Screenshot extrahiert" };
+    }
+
+    // ---------- Parser (robust gegen typische OCR-Fehler) ----------
+    function normalizeText(t){
+      return (t || "")
+        .replace(/[–—]/g, "-")
+        .replace(/\u00A0/g, " ")
+        .replace(/(\d)\s+(\d)/g, "$1$2")        // "17 45" -> "1745"
+        .replace(/(\d{1,2})(\d{2})/g, (m,a,b)=> { // "1745" -> "17:45" (nur wenn sinnvoll)
+          if (m.length===4 && Number(a)<=23) return `${a}:${b}`;
+          return m;
+        })
+        .replace(/S/g, "5")                     // "1S" -> "15"
+        .replace(/O/g, "0");                     // "2O:15" -> "20:15"
+    }
+
+    function detectMonthYear(text){
+      // sucht z.B. "Feb. 2026" / "Feb 2026" / "Februar 2026"
+      const t = text.toLowerCase();
+      const months = [
+        ["januar","jan",1], ["februar","feb",2], ["märz","maerz","mrz",3],
+        ["april","apr",4], ["mai","mai",5], ["juni","jun",6],
+        ["juli","jul",7], ["august","aug",8], ["september","sep",9],
+        ["oktober","okt",10], ["november","nov",11], ["dezember","dez",12]
+      ];
+
+      let foundMonth = null;
+      for (const row of months){
+        const names = row.slice(0, row.length-1);
+        const mNum = row[row.length-1];
+        for (const name of names){
+          const re = new RegExp("\\b"+name+"\\.?\\b","i");
+          if (re.test(t)){ foundMonth = mNum; break; }
+        }
+        if (foundMonth) break;
+      }
+
+      const y = (t.match(/\b(20\d{2})\b/) || [])[1];
+      return {
+        year: y ? Number(y) : null,
+        month: foundMonth
+      };
+    }
+
+    function parseShifts(rawText){
+      const text = normalizeText(rawText);
+      const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
+
+      const { year: autoY, month: autoM } = detectMonthYear(text);
+      // Fallback: wenn nichts gefunden, nehmen wir aktuelles Jahr/Monat
+      const now = new Date();
+      const year = autoY ?? now.getFullYear();
+      const month = autoM ?? (now.getMonth()+1);
+
+      const events = [];
+      const reDate = /^(\d{1,2})\s*(Mo|Di|Mi|Do|Fr|Sa|So)\.?$/i;
+      const reTime = /(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/;
+
+      for (let i=0;i<lines.length;i++){
+        const md = lines[i].match(reDate);
+        if (!md) continue;
+
+        const day = Number(md[1]);
+
+        const timeLine = lines[i+1] || "";
+        const mt = timeLine.match(reTime);
+        if (!mt) continue;
+
+        const titleLine = lines[i+2] || "Dienst";
+        const title = titleLine;
+
+        const start = toDateTimeLocal(year, month, day, mt[1]);
+        const end = toDateTimeLocal(year, month, day, mt[2]);
+
+        // falls Endzeit < Startzeit (Schicht über Mitternacht), +1 Tag
+        if (end < start) end.setDate(end.getDate()+1);
+
+        events.push(mkEvent(title, start, end));
+      }
+
+      return events;
+    }
+
+    function toDateTimeLocal(y, m, d, hhmm){
+      const [hh, mm] = hhmm.split(":").map(Number);
+      return new Date(y, m-1, d, hh, mm, 0);
+    }
+
+    // ---------- ICS ----------
+    function pad(n){ return String(n).padStart(2,"0"); }
+    function fmtIcsLocal(dt){
+      return (
+        dt.getFullYear() +
+        pad(dt.getMonth()+1) +
+        pad(dt.getDate()) +
+        "T" +
+        pad(dt.getHours()) +
+        pad(dt.getMinutes()) +
+        pad(dt.getSeconds())
+      );
+    }
+    function escapeIcs(s){
+      return String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/\n/g, "\\n")
+        .replace(/,/g, "\\,")
+        .replace(/;/g, "\\;");
+    }
+    function buildIcs(events){
+      const now = new Date();
+      const dtstamp = fmtIcsLocal(now);
+
+      const vevents = events.map((e, idx) => {
+        const uid = `${dtstamp}-${idx}@dienstplan.local`;
+        return [
+          "BEGIN:VEVENT",
+          `UID:${uid}`,
+          `DTSTAMP:${dtstamp}`,
+          // Floating local times (Apple Kalender kommt damit meist klar)
+          `DTSTART:${fmtIcsLocal(e.start)}`,
+          `DTEND:${fmtIcsLocal(e.end)}`,
+          `SUMMARY:${escapeIcs(e.title)}`,
+          `DESCRIPTION:${escapeIcs(e.description || "")}`,
+          "END:VEVENT"
+        ].join("\r\n");
+      }).join("\r\n");
+
+      return [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Dienstplan OCR//DE",
+        "CALSCALE:GREGORIAN",
+        vevents,
+        "END:VCALENDAR",
+        ""
+      ].join("\r\n");
+    }
+  </script>
+</body>
+</html>
