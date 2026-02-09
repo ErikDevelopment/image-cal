@@ -17,37 +17,18 @@ const barFill = document.getElementById("barFill");
 let lastEvents = [];
 let lastIcs = "";
 
-// ---------------- Debug helpers ----------------
-function dbg(...args) { console.log("[DBG]", ...args); }
-function charCodes(s) {
-  return Array.from(s).map(ch => ch.charCodeAt(0));
-}
-function showLine(label, line) {
-  dbg(label, JSON.stringify(line));
-  dbg(label + " charCodes", charCodes(line));
-}
-// ------------------------------------------------
-
-dbg("app.js loaded");
-
 fileEl.addEventListener("change", () => {
   const f = fileEl.files?.[0];
   statusEl.textContent = f ? `Ausgewählt: ${f.name}` : "Warte auf Bild…";
-  dbg("file change", f ? { name: f.name, type: f.type, size: f.size } : null);
 });
 
 runBtn.addEventListener("click", async () => {
   const file = fileEl.files?.[0];
-  if (!file) {
-    dbg("run clicked but no file");
-    return setStatus("Bitte erst ein Bild auswählen.");
-  }
+  if (!file) return setStatus("Bitte erst ein Bild auswählen.");
 
   setBusy(true);
   outEl.textContent = "OCR startet…";
   updateProgress(0);
-
-  dbg("OCR start", { name: file.name, type: file.type, size: file.size });
 
   try {
     const { data } = await Tesseract.recognize(file, "deu", {
@@ -58,38 +39,24 @@ runBtn.addEventListener("click", async () => {
       },
     });
 
-    const rawText = (data.text || "");
-    const text = rawText.trim();
-
-    dbg("OCR done");
-    dbg("OCR raw length", rawText.length);
-    dbg("OCR trimmed length", text.length);
-    dbg("OCR raw preview", JSON.stringify(rawText.slice(0, 400)));
-    dbg("OCR trimmed preview", JSON.stringify(text.slice(0, 400)));
-
+    const text = (data.text || "").trim();
     outEl.textContent = text || "Kein Text erkannt.";
 
     lastEvents = parseShifts(text);
     lastIcs = buildIcs(lastEvents);
 
-    dbg("events count", lastEvents.length);
-    dbg("events", lastEvents);
-
     render(eventsToLines(lastEvents), lastIcs);
     setStatus(lastEvents.length ? "Termine erkannt ✅" : "Keine Termine erkannt (Text prüfen).");
   } catch (e) {
     console.error(e);
-    dbg("OCR error", String(e));
     setStatus("OCR Fehler. (Tipp: anderes Bild / höherer Kontrast)");
     outEl.textContent = String(e);
   } finally {
     setBusy(false);
-    dbg("OCR finished (finally)");
   }
 });
 
 demoBtn.addEventListener("click", () => {
-  dbg("demo clicked");
   lastEvents = [
     mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 11, 17, 45), new Date(2026, 1, 11, 22, 15)),
     mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 15, 13, 45), new Date(2026, 1, 15, 22, 15)),
@@ -104,7 +71,6 @@ demoBtn.addEventListener("click", () => {
 });
 
 dlBtn.addEventListener("click", () => {
-  dbg("download clicked", { events: lastEvents.length, icsLen: lastIcs.length });
   const blob = new Blob([lastIcs], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -115,7 +81,6 @@ dlBtn.addEventListener("click", () => {
 });
 
 function setBusy(on) {
-  dbg("setBusy", on);
   spinEl.style.display = on ? "inline-block" : "none";
   runBtn.disabled = on;
   demoBtn.disabled = on;
@@ -123,18 +88,15 @@ function setBusy(on) {
 }
 
 function setStatus(t) {
-  dbg("status", t);
   statusEl.textContent = t;
 }
 
 function updateProgress(p) {
-  // dbg("progress", p); // zu spammy
   ocrPct.textContent = p ? `${p}%` : "bereit";
   barFill.style.width = `${p}%`;
 }
 
 function render(lines, ics) {
-  dbg("render", { lines: lines.length, icsLen: ics.length });
   const has = lines.length > 0;
   previewEl.textContent = has ? lines.join("\n") : "Noch keine Vorschau.";
   summaryEl.textContent = has ? `${lines.length} Termin(e) erkannt.` : "Keine Termine erkannt.";
@@ -161,57 +123,52 @@ function mkEvent(title, start, end) {
 }
 
 // ---------------- Parser ----------------
-function normalizeText(t){
-  const before = t || "";
-  const after = (before)
+
+// Nur Zeitstrings korrigieren (nicht "So." kaputt machen)
+function fixTimeStr(s) {
+  return String(s).replace(/S/g, "5").replace(/O/g, "0");
+}
+
+function normalizeText(t) {
+  return (t || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/[–—]/g, "-")
     .replace(/\u00A0/g, " ")
-    .replace(/S/g, "5")
-    .replace(/O/g, "0")
     .replace(/[ \t]+/g, " ");
-
-  dbg("normalizeText", { beforeLen: before.length, afterLen: after.length });
-  dbg("normalize preview", JSON.stringify(after.slice(0, 300)));
-
-  return after;
 }
 
 function detectMonthYear(text) {
   const t = (text || "").toLowerCase();
 
   const monthMap = [
-    [["januar","jan"], 1],
-    [["februar","feb"], 2],
-    [["märz","maerz","mrz"], 3],
-    [["april","apr"], 4],
+    [["januar", "jan"], 1],
+    [["februar", "feb"], 2],
+    [["märz", "maerz", "mrz"], 3],
+    [["april", "apr"], 4],
     [["mai"], 5],
-    [["juni","jun"], 6],
-    [["juli","jul"], 7],
-    [["august","aug"], 8],
-    [["september","sep"], 9],
-    [["oktober","okt"], 10],
-    [["november","nov"], 11],
-    [["dezember","dez"], 12],
+    [["juni", "jun"], 6],
+    [["juli", "jul"], 7],
+    [["august", "aug"], 8],
+    [["september", "sep"], 9],
+    [["oktober", "okt"], 10],
+    [["november", "nov"], 11],
+    [["dezember", "dez"], 12],
   ];
 
   let month = null;
   for (const [names, num] of monthMap) {
     if (names.some((n) => new RegExp(`\\b${n}\\.?\\b`, "i").test(t))) {
-      month = num; break;
+      month = num;
+      break;
     }
   }
 
   const y = (t.match(/\b(20\d{2})\b/) || [])[1];
-  const res = { year: y ? Number(y) : null, month };
-
-  dbg("detectMonthYear", res);
-  return res;
+  return { year: y ? Number(y) : null, month };
 }
 
-function parseShifts(rawText){
-  dbg("parseShifts start");
+function parseShifts(rawText) {
   const text = normalizeText(rawText);
 
   const now = new Date();
@@ -219,68 +176,40 @@ function parseShifts(rawText){
   let currentYear = yAuto ?? now.getFullYear();
   let currentMonth = mAuto ?? (now.getMonth() + 1);
 
-  dbg("base date", { currentYear, currentMonth });
-
-  // Pair matching (deine aktuelle Regex-Strategie)
+  // Matcht:
+  // 15 13:45 - 22:15
+  // So. Kasse - Total Kriftel
   const rePair =
     /(?:^|\n)\s*(\d{1,2})\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*\n\s*(mo|di|mi|do|fr|sa|so)\s*\.?\s*(.+?)(?=\n|$)/gi;
-
-  dbg("rePair", rePair.toString());
-
-  // Zusätzlich: wir loggen jede Zeile und markieren, welche "time-lines" sind
-  const lines = text.split("\n");
-  dbg("lines count", lines.length);
-  for (let i = 0; i < lines.length; i++) {
-    const L = lines[i];
-    if (!L.trim()) continue;
-    // Zeilen, die wie "15 13:45 - 22:15" aussehen
-    if (/\d{1,2}\s+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/.test(L)) {
-      showLine(`TIME-LINE #${i}`, L);
-      if (lines[i+1]) showLine(`NEXT-LINE #${i+1}`, lines[i+1]);
-    }
-    // Zeilen, die mit So./Mi. etc anfangen
-    if (/^(mo|di|mi|do|fr|sa|so)\.?/i.test(L.trim())) {
-      showLine(`DOW-LINE #${i}`, L);
-    }
-  }
 
   let lastDaySeen = 0;
   const events = [];
 
   let m;
-  let matchIndex = 0;
   while ((m = rePair.exec(text)) !== null) {
-    matchIndex++;
-    dbg(`MATCH ${matchIndex}`, {
-      day: m[1],
-      start: m[2],
-      end: m[3],
-      dow: m[4],
-      title: m[5],
-      at: m.index
-    });
-
     const day = Number(m[1]);
-    const startStr = m[2];
-    const endStr = m[3];
-    const title = (m[5] || "Dienst").trim();
+    const startStr = fixTimeStr(m[2]);
+    const endStr = fixTimeStr(m[3]);
+    const title = (m[5] || "Dienst").trim() || "Dienst";
 
     // Monatswechsel (25 -> 01)
     if (lastDaySeen && day < lastDaySeen) {
       currentMonth += 1;
-      if (currentMonth > 12) { currentMonth = 1; currentYear += 1; }
-      dbg("month rollover ->", { currentYear, currentMonth });
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear += 1;
+      }
     }
     lastDaySeen = day;
 
     const start = toDateTimeLocal(currentYear, currentMonth, day, startStr);
     const end = toDateTimeLocal(currentYear, currentMonth, day, endStr);
+
+    // Schicht über Mitternacht
     if (end < start) end.setDate(end.getDate() + 1);
 
     events.push(mkEvent(title, start, end));
   }
-
-  dbg("parseShifts done", { matches: matchIndex, events: events.length });
 
   return events;
 }
@@ -291,7 +220,9 @@ function toDateTimeLocal(y, m, d, hhmm) {
 }
 
 // ---------------- ICS ----------------
-function pad(n) { return String(n).padStart(2, "0"); }
+function pad(n) {
+  return String(n).padStart(2, "0");
+}
 function fmtIcsLocal(dt) {
   return (
     dt.getFullYear() +
@@ -304,37 +235,39 @@ function fmtIcsLocal(dt) {
   );
 }
 function escapeIcs(s) {
-  return String(s).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
 }
 function buildIcs(events) {
-  dbg("buildIcs", { events: events.length });
   const now = new Date();
   const dtstamp = fmtIcsLocal(now);
 
-  const vevents = events.map((e, idx) => {
-    const uid = `${dtstamp}-${idx}@dienstplan.local`;
-    return [
-      "BEGIN:VEVENT",
-      `UID:${uid}`,
-      `DTSTAMP:${dtstamp}`,
-      `DTSTART:${fmtIcsLocal(e.start)}`,
-      `DTEND:${fmtIcsLocal(e.end)}`,
-      `SUMMARY:${escapeIcs(e.title)}`,
-      `DESCRIPTION:${escapeIcs(e.description || "")}`,
-      "END:VEVENT",
-    ].join("\r\n");
-  }).join("\r\n");
+  const vevents = events
+    .map((e, idx) => {
+      const uid = `${dtstamp}-${idx}@dienstplan.local`;
+      return [
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART:${fmtIcsLocal(e.start)}`,
+        `DTEND:${fmtIcsLocal(e.end)}`,
+        `SUMMARY:${escapeIcs(e.title)}`,
+        `DESCRIPTION:${escapeIcs(e.description || "")}`,
+        "END:VEVENT",
+      ].join("\r\n");
+    })
+    .join("\r\n");
 
-  const ics = [
+  return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Dienstplan OCR//DE",
     "CALSCALE:GREGORIAN",
     vevents,
     "END:VCALENDAR",
-    ""
+    "",
   ].join("\r\n");
-
-  dbg("buildIcs done", { len: ics.length });
-  return ics;
 }
