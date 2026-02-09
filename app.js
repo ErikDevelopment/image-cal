@@ -58,12 +58,12 @@ runBtn.addEventListener("click", async () => {
 
 demoBtn.addEventListener("click", () => {
   lastEvents = [
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 11, 17, 45), new Date(2026, 1, 11, 22, 15)),
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 15, 13, 45), new Date(2026, 1, 15, 22, 15)),
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 18, 17, 45), new Date(2026, 1, 18, 22, 15)),
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 22, 14, 45), new Date(2026, 1, 22, 22, 15)),
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 1, 25, 17, 45), new Date(2026, 1, 25, 22, 15)),
-    mkEvent("Kasse - Total Kriftel", new Date(2026, 2, 1, 14, 45), new Date(2026, 2, 1, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 1, 11, 17, 45), new Date(2026, 1, 11, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 1, 15, 13, 45), new Date(2026, 1, 15, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 1, 18, 17, 45), new Date(2026, 1, 18, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 1, 22, 14, 45), new Date(2026, 1, 22, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 1, 25, 17, 45), new Date(2026, 1, 25, 22, 15)),
+    mkEvent("Kasse", new Date(2026, 2, 1, 14, 45), new Date(2026, 2, 1, 22, 15)),
   ];
   lastIcs = buildIcs(lastEvents);
   render(eventsToLines(lastEvents), lastIcs);
